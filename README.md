@@ -4,7 +4,8 @@ Attempts at solving one off problems where dataset is available in public or can
 
 1) FASHION MNIST PROBLEM
     - File: fashion_mnist_net.py
-    - Running this file trains a Convolutional Neural Network. 
+    - Running this file trains a Convolutional Neural Network.
+    - Command line arguments are -e number_of_epochs and -p path_to_save_file 
     - Code written using PyTorch and can be run on GPU
     - This CNN accepts images of dimensions 28x28x1
     - This CNN has first layer as a conv layer with 6 filters and window size 5x5. This layer converts 28x28x1 input to 24x24x6 output

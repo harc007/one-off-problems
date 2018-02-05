@@ -9,7 +9,9 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
+import os
+import sys
+import argparse
 
 def transform_images_to_tensors():
     try:
@@ -45,15 +47,17 @@ class Net(nn.Module):
         super(Net, self).__init__()
         self.conv1 = nn.Conv2d(1, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16*4*4, 120)
+        self.conv2 = nn.Conv2d(6, 16, 3)
+        self.conv3 = nn.Conv2d(16, 24, 3)
+        self.fc1 = nn.Linear(24*3*3, 120)
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, 10)
     
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 16*4*4)
+        x = F.relu(self.conv3(x))
+        x = x.view(-1, 24*3*3)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
@@ -74,7 +78,6 @@ def train(trainloader, net, criterion, optimizer, is_gpu, n_epochs=2):
                     inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
                 else:
                     inputs, labels = Variable(inputs), Variable(labels)
-                    print(1, inputs.shape, labels.shape)
                 optimizer.zero_grad()
                 outputs = net(inputs)
                 loss = criterion(outputs, labels)
@@ -110,10 +113,13 @@ def test_multiple(testloader, net, is_gpu):
         for data in testloader:
             test_images, labels = data
             if is_gpu:
-                outputs = net(Variable(test_images.cuda()))
-                _, predicted = torch.max(outputs.cuda().data, 1)
-            else:
-                outputs = net(Variable(test_images))
+                test_images = test_images.cuda()
+                labels = labels.cuda()
+              
+            outputs = net(Variable(test_images))
+
+            if is_gpu:
+                outputs = outputs.cuda()
 
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
@@ -123,18 +129,48 @@ def test_multiple(testloader, net, is_gpu):
         print(traceback.format_exc())
         raise e
 
+def save_model(net, path='fashion_mnist_01'):
+    try:
+        torch.save(net.state_dict(), path)
+        return True
+    except Exception as e:
+        print(traceback.format_exc())
+        return False
+
+def load_model(is_gpu, path='fashion_mnist_01'):
+    try:
+        net = Net()
+        net.load_state_dict(torch.load(path))
+        if is_gpu:
+            net = net.cuda()
+        return net
+    except Exception as e:
+        print(traceback.format_exc())
+        raise e
+
+
 if __name__=='__main__':
-    is_gpu = False
+    parser = argparse.ArgumentParser(description="fashion mnist")
+    parser.add_argument('-p', '--path', default="fashion_mnist_01")
+    parser.add_argument('-e', '--epochs', default=2, type=int)
+    args = parser.parse_args()
+    path_to_file = args.path
+    n_epochs = args.epochs
     trainloader, testloader, classes = transform_images_to_tensors()
-    showimages(trainloader)
-    net = Net()
-    print("Done1")
-    if is_gpu:
-        criterion, optimizer = get_optimizer(net.cuda())
-    else:
+    is_gpu = torch.cuda.is_available()
+    if not os.path.isfile(path_to_file):
+        showimages(trainloader)
+        net = Net()
+        if is_gpu:
+            net = net.cuda()
         criterion, optimizer = get_optimizer(net)
-    print("Done2")
-    outputs = train(trainloader, net, criterion, optimizer, is_gpu, 2)
-    print("Finished training")
+        print("Training....")
+        outputs = train(trainloader, net, criterion, optimizer, is_gpu, n_epochs)
+        print("Finished training")
+        save_model(net, path_to_file)
+        print("Saved file in location {0}".format(path_to_file))
+    print("Loading model {0}".format(path_to_file))
+    net = load_model(is_gpu, path_to_file)
+    print("Testing...") 
     correct, total = test_multiple(testloader, net, is_gpu)
     print("accuracy of network on the 1000 test images: %d %%" % (100*correct/total))
