@@ -2,7 +2,6 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 import traceback
-import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 from torch.autograd import Variable
@@ -12,6 +11,10 @@ import torch.optim as optim
 import os
 import sys
 import argparse
+import torchvision.utils as vutils
+from tensorboardX import SummaryWriter
+
+writer = SummaryWriter('board')
 
 def transform_images_to_tensors():
     try:
@@ -73,8 +76,9 @@ def get_optimizer(net):
     optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
     return criterion, optimizer
 
-def train(trainloader, net, criterion, optimizer, is_gpu, n_epochs=2):
+def train(trainloader, net, criterion, optimizer, is_gpu, n_epochs=2, is_accuracy_comparison=True):
     try:
+        images_seen = 0
         for epoch in range(n_epochs):
             running_loss = 0.0
             for i, data in enumerate(trainloader, 0):
@@ -89,9 +93,20 @@ def train(trainloader, net, criterion, optimizer, is_gpu, n_epochs=2):
                 loss.backward()
                 optimizer.step()
                 running_loss += loss.data[0]
-                if i%2000 == 1999:
-                    print("[%d, %5d] loss: %3f" % (epoch+1, i+1, running_loss/2000))
+                if i%2000 == 0:
+                    imgs = vutils.make_grid(inputs.cpu().data, normalize=True, scale_each=True)
+                    writer.add_image('f_image', imgs, i+1+images_seen)
+                    print("[%d, %5d] loss: %3f" % (epoch+1, i+1+images_seen, running_loss/2000))
+                    writer.add_scalar('f_data/running_loss', running_loss/2000.0, i+1+images_seen)
                     running_loss = 0.0
+                    if is_accuracy_comparison:
+                        test_correct, test_total = test_multiple(testloader, net, is_gpu)
+                        test_accuracy = 100*test_correct/test_total
+                        train_correct, train_total = test_multiple(trainloader, net, is_gpu)
+                        train_accuracy = 100*train_correct/train_total
+                        writer.add_scalar('f_data/train_accuracy', train_accuracy, i+1+images_seen)
+                        writer.add_scalar('f_data/test_accuracy', test_accuracy, i+1+images_seen)
+                    images_seen += i
         return outputs
     except Exception as e:
         print(traceback.format_exc())

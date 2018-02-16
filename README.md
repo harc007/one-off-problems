@@ -15,3 +15,5 @@ Attempts at solving one off problems where dataset is available in public or can
     - The 5th, 6th and 7th layers are fully connected layers that reduce dimensionality from 32*7*7 to 160, 84 and 10 respectively
     - The code trains a network with above architecture and returns the test accuracy
     - Currently, this architecture gives an accuracy of 91% on test set
+
+![Alt text](images/tensorboard.png?raw=true "Accuray")
