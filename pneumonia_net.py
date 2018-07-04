@@ -8,6 +8,15 @@ crop_size = 800
 data_dir = os.path.join(os.getcwd(), 'chest_xray')
 mname = 'resnet18'
 pretrained = True
+lossname = 'crossentropy'
+optimname = 'sgd'
+is_fc = True
+lr = 0.001
+momentum = 0.9
+schname = 'step'
+step_size = 7
+gamma = 0.1
+num_epochs = 10
 
 
 dtransform = cv.get_data_transforms(ccmean, ccstd,
@@ -23,4 +32,12 @@ if show_image:
     cv.imshow(inputs, ccmean, ccstd, title=titles)
 
 model = cv.get_model(mname, len(all_classes), device, pretrained=pretrained)
-print(model)
+
+criterion = cv.get_loss_criteria(lossname)
+
+optimizer = cv.get_optimizer(optimname, is_fc, lr, momentum, model)
+
+scheduler = cv.get_scheduler(schname, optimizer, step_size, gamma)
+
+model_ft = cv.train_model(model, criterion, optimizer, scheduler, num_epochs, dloaders, device)
+rint(model_ft)

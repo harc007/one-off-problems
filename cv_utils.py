@@ -1,12 +1,15 @@
+import torch
 import numpy as np
 import traceback
 from torchvision import transforms, datasets, utils, models
 from torch.utils.data import DataLoader
-from torch import device, cuda
+from torch import device, cuda, optim
+from torch.optim import lr_scheduler
 import os
 import matplotlib.pyplot as plt
 import time
 from torch import nn
+import copy
 
 def get_data_transforms(ccmean, ccstd, crop_size, 
                             data_types=['train', 'test', 'val']):
@@ -71,6 +74,112 @@ def get_model(mname, num_class, dev, pretrained=True):
     except Exception as e:
         print(traceback.format_exc())
         raise e
+
+
+def get_loss_criteria(lossname):
+    try:
+        if lossname == 'crossentropy':
+            return nn.CrossEntropyLoss()
+        elif lossname == 'nll':
+            return nn.NLLLoss()
+        else:
+            return None
+    except Exception as e:
+        print(traceback.format_exc())
+        raise e
+   
+
+def get_optimizer(optimname, is_fc, lr, momentum, model_ft):
+    try:
+        if optimname == 'sgd':
+            if is_fc:
+                return optim.SGD(model_ft.fc.parameters(), lr=lr, momentum=momentum)
+            else:
+                return optim.SGD(model_ft.parameters(), lr=lr, momentum=momentum)
+        elif lossname == 'adadelta':
+            if is_fc:
+                return optim.Adadelta(model_ft.fc.parameters(), lr=lr)
+            else:
+                return optim.Adadelta(model_ft.parameters(), lr=lr)
+        else:
+            return None
+    except Exception as e:
+        print(traceback.format_exc())
+        raise e
+
+
+def get_scheduler(schname, optimizer, step_size, gamma):
+    try:
+        if schname == 'step':
+            return lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=gamma)
+        else:
+            return None
+    except Exception as e:
+        print(traceback.format_exc())
+        raise e
+
+
+def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders, device):
+    try:
+        st = time.time()
+        best_model_wts = copy.deepcopy(model.state_dict())
+        best_acc = 0.0
+
+        for epoch in range(num_epochs):
+            print('Epoch {}/{}'.format(epoch, num_epochs - 1))
+            print('-' * 10)
+
+            for phase in ['train', 'val']:
+                if phase == 'train':
+                    scheduler.step()
+                    model.train()
+                else:
+                    model.eval()
+
+                running_loss = 0.0
+                running_corrects = 0
+
+                for inputs, labels in dataloaders[phase]:
+                    inputs = inputs.to(device)
+                    labels = labels.to(device)
+
+                    optimizer.zero_grad()
+
+                    with torch.set_grad_enabled(phase == 'train'):
+                        outputs = model(inputs)
+                        _, preds = torch.max(outputs, 1)
+                        loss = criterion(outputs, labels)
+
+                        if phase == 'train':
+                            loss.backward()
+                            optimizer.step()
+
+                    running_loss += loss.item() * inputs.size(0)
+                    running_corrects += torch.sum(preds == labels.data)
+
+                epoch_loss = running_loss / dataset_sizes[phase]
+                epoch_acc = running_corrects.double() / dataset_sizes[phase]
+
+                print('{} Loss: {:.4f} Acc: {:.4f}'.format(
+                            phase, epoch_loss, epoch_acc))
+
+                if phase == 'val' and epoch_acc > best_acc:
+                    best_acc = epoch_acc
+                    best_model_wts = copy.deepcopy(model.state_dict())
+
+            print()
+
+        time_elapsed = time.time() - st
+        print('Training complete in {:.0f}m {:.0f}s'.format(
+                    time_elapsed // 60, time_elapsed % 60))
+        print('Best val Acc: {:4f}'.format(best_acc))
+
+        model.load_state_dict(best_model_wts)
+        return model
+    except Exception as e:
+        print(traceback.format_exc())
+        raise e
+
 
 # One time Method to be tried in ipython to find mean and std
 def get_mean_std_channels(data_dir, crop_size, bs=4):
