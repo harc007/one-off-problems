@@ -57,7 +57,7 @@ def imshow(inp, ccmean, ccstd, title=None):
     plt.close()
 
 
-def get_model(mname, num_class, dev, pretrained=True):
+def get_model(mname, num_class, dev, num_ftrs, pretrained=True):
     try:
         model_ft = None
         if mname == 'resnet18' and pretrained:
@@ -66,8 +66,8 @@ def get_model(mname, num_class, dev, pretrained=True):
             model_ft = models.resnet18()
         
         if model_ft:
-            num_ftrs = model_ft.fc.in_features
-            model_ft.fc = nn.Linear(num_ftrs, num_class)
+            model_ft.fc = nn.Sequential(nn.Linear(num_ftrs, num_ftrs/10),
+                                nn.Linear(num_ftrs/10, 2))
             model_ft = model_ft.to(dev)
             return model_ft
         return model_ft
@@ -119,7 +119,7 @@ def get_scheduler(schname, optimizer, step_size, gamma):
         raise e
 
 
-def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders, device):
+def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders, device, dataset_sizes):
     try:
         st = time.time()
         best_model_wts = copy.deepcopy(model.state_dict())
