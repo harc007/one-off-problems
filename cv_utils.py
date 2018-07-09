@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import traceback
 from torchvision import transforms, datasets, utils, models
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, sampler
 from torch import device, cuda, optim
 from torch.optim import lr_scheduler
 import os
@@ -17,8 +17,7 @@ def get_data_transforms(ccmean, ccstd, crop_size,
         if len(ccmean) != len(ccstd) or len(ccmean) != len(data_types):
             return None
         data_transforms = {k:transforms.Compose([
-                                transforms.RandomResizedCrop(crop_size),
-                                transforms.RandomHorizontalFlip(),
+                                transforms.Resize((crop_size, crop_size)),
                                 transforms.ToTensor(),
                                 transforms.Normalize(ccmean, ccstd)
                             ]) for k in data_types}
@@ -28,13 +27,17 @@ def get_data_transforms(ccmean, ccstd, crop_size,
         raise e
 
 
-def get_dataloader_obj(data_dir, data_transforms, 
-                        data_types=['train', 'test', 'val'], bs=4):
+def get_dataloader_obj(data_dir, data_transforms, weights, num_samples,  
+                        is_slr=False,data_types=['train', 'test', 'val'], bs=4):
     try:
+        slr = sampler.WeightedRandomSampler(weights, num_samples)
         image_datasets = {x:datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x]) 
                             for x in data_types}
-        dataloaders = {x:DataLoader(image_datasets[x], batch_size=bs,
-                            shuffle=True, num_workers=bs) for x in data_types}
+        dataloaders = {x:DataLoader(image_datasets[x], batch_size=bs, 
+            shuffle=True, num_workers=bs) for x in data_types}
+        if is_slr:
+            dataloaders = {x:DataLoader(image_datasets[x], batch_size=bs, 
+                sampler=slr, num_workers=bs) for x in data_types}
         dsizes = {x:len(image_datasets[x]) for x in data_types}
         class_names = image_datasets['train'].classes
         dev = device("cuda:0" if cuda.is_available() else "cpu")
