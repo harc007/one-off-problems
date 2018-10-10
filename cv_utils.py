@@ -65,9 +65,19 @@ def get_model(mname, num_class, dev, num_ftrs, pretrained=True):
         model_ft = None
         if mname == 'resnet18' and pretrained:
             model_ft = models.resnet18(pretrained=True)
-        elif mnane == 'resnet18' and not pretrained:
-            model_ft = models.resnet18()
+        elif mname == 'resnet18' and not pretrained:
+            model_ft = models.resnet18() 
         
+        if mname == 'alexnet' and pretrained:
+            model_ft = models.alexnet(pretrained=True)
+        elif mname == 'alexnet' and not pretrained:
+            model_ft = models.alexnet()
+
+        if mname == 'vgg11' and pretrained:
+            model_ft = models.vgg11(pretrained=True)
+        elif mname == 'vgg11' and not pretrained:
+            model_ft = models.vgg11()
+
         if model_ft:
             model_ft.fc = nn.Sequential(nn.Linear(num_ftrs, num_ftrs/10),
                                 nn.Linear(num_ftrs/10, 2))
@@ -99,7 +109,7 @@ def get_optimizer(optimname, is_fc, lr, momentum, model_ft):
                 return optim.SGD(model_ft.fc.parameters(), lr=lr, momentum=momentum)
             else:
                 return optim.SGD(model_ft.parameters(), lr=lr, momentum=momentum)
-        elif lossname == 'adadelta':
+        elif optimname == 'adadelta':
             if is_fc:
                 return optim.Adadelta(model_ft.fc.parameters(), lr=lr)
             else:
